@@ -1,0 +1,11 @@
+Metadata-Version: 2.4
+Name: api-reliability
+Version: 0.1.0
+Summary: A Python tool for collecting and analyzing public API reliability metrics.
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+Requires-Dist: requests
+Requires-Dist: pandas
+Requires-Dist: matplotlib
+Provides-Extra: dev
+Requires-Dist: pytest; extra == "dev"
