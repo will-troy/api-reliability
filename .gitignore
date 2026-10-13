@@ -1,3 +1,5 @@
+# Generated Python packaging metadata
+*.egg-info/
 
 # Python bytecode
 __pycache__/
