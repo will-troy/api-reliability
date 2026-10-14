@@ -5,6 +5,8 @@ from datetime import datetime, timezone
 
 import requests
 
+from api_reliability.storage import save_results
+
 
 GITHUB_API_URL = "https://api.github.com/repos"
 
@@ -79,6 +81,7 @@ def monitor(
             while max_requests is None or len(results) < max_requests:
                 result = collect_once(session, repo, timeout)
                 results.append(result)
+                save_results([result])
 
                 # Print each observation as a JSON record.
                 print(json.dumps(result))
