@@ -89,7 +89,14 @@ def collect_endpoint(session, endpoint, timeout=10.0):
     return COLLECTORS[endpoint](session, timeout=timeout)
 
 
-def monitor(endpoints=None, interval=60.0, timeout=10.0, max_requests=None):
+def monitor(
+    endpoints=None,
+    interval=60.0,
+    timeout=10.0,
+    max_requests=None,
+    latitude=40.7128,
+    longitude=-74.0060,
+):
     """Poll each selected endpoint once per cycle and save each observation.
 
     max_requests counts cycles, not individual endpoint calls.
@@ -100,6 +107,10 @@ def monitor(endpoints=None, interval=60.0, timeout=10.0, max_requests=None):
         raise ValueError("timeout must be greater than zero")
     if max_requests is not None and max_requests < 1:
         raise ValueError("max_requests must be at least 1")
+    if not -90 <= latitude <= 90:
+        raise ValueError("latitude must be between -90 and 90")
+    if not -180 <= longitude <= 180:
+        raise ValueError("longitude must be between -180 and 180")
 
     selected = list(COLLECTORS) if endpoints is None else list(endpoints)
     if not selected:
@@ -122,7 +133,13 @@ def monitor(endpoints=None, interval=60.0, timeout=10.0, max_requests=None):
             while max_requests is None or cycles < max_requests:
                 cycle_start = time.perf_counter()
                 for endpoint in selected:
-                    result = collect_endpoint(session, endpoint, timeout)
+                    if endpoint == "open-meteo":
+                        result = collect_open_meteo(
+                            session, latitude=latitude, longitude=longitude,
+                            timeout=timeout,
+                        )
+                    else:
+                        result = collect_endpoint(session, endpoint, timeout)
                     results.append(result)
                     save_results([result])
                     print(json.dumps(result))
@@ -152,13 +169,28 @@ def main():
     parser.add_argument("--interval", type=float, default=60)
     parser.add_argument("--timeout", type=float, default=10)
     parser.add_argument(
+        "--latitude", type=float, default=40.7128,
+        help="Latitude for Open-Meteo (default: 40.7128, New York City).",
+    )
+    parser.add_argument(
+        "--longitude", type=float, default=-74.0060,
+        help="Longitude for Open-Meteo (default: -74.0060, New York City).",
+    )
+    parser.add_argument(
         "--max-requests",
         type=int,
         default=None,
         help="Number of cycles; each cycle calls each selected endpoint once.",
     )
     args = parser.parse_args()
-    monitor(args.endpoints, args.interval, args.timeout, args.max_requests)
+    monitor(
+        endpoints=args.endpoints,
+        interval=args.interval,
+        timeout=args.timeout,
+        max_requests=args.max_requests,
+        latitude=args.latitude,
+        longitude=args.longitude,
+    )
 
 
 if __name__ == "__main__":
