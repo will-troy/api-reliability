@@ -6,6 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "api-reliability"
 version = "0.1.0"
 description = "A Python tool for collecting and analyzing public API reliability metrics."
+readme = "README.md"
 requires-python = ">=3.11"
 dependencies = ["requests", "pandas", "matplotlib"]
 
@@ -17,3 +18,5 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "-ra"
+
