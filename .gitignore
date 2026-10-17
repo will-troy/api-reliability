@@ -20,8 +20,8 @@ venv/
 
 # Local generated data and reports
 data/*.csv
-reports/*.png
-reports/*.pdf
+reports/charts/*.png
+reports/*.csv
 
 # macOS
 .DS_Store
