@@ -23,7 +23,7 @@ A Python tool that monitors public APIs, collects performance metrics, and analy
 Clone the repository and navigate into the project directory:
 
 ```bash
-git clone <your-repository-url>
+git clone https://github.com/will-troy/api-reliability
 cd api-reliability
 ```
 
