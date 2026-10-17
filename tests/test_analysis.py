@@ -245,3 +245,53 @@ def test_export_report_creates_parent_directory_and_csv(tmp_path):
     loaded = pd.read_csv(filepath)
     assert loaded.iloc[0]["endpoint"] == "api-a"
     assert loaded.iloc[0]["request_count"] == 2
+
+
+def test_analyze_response_sizes_summarizes_known_sizes():
+    observations = pd.DataFrame([
+        {"endpoint": "api-a", "response_size_bytes": 100},
+        {"endpoint": "api-a", "response_size_bytes": 300},
+        {"endpoint": "api-a", "response_size_bytes": None},
+        {"endpoint": "api-b", "response_size_bytes": 50},
+    ])
+    result = analysis.analyze_response_sizes(observations)
+    api_a = result[result["endpoint"] == "api-a"].iloc[0]
+    assert api_a["responses_with_size"] == 2
+    assert api_a["mean_response_size_bytes"] == 200
+    assert api_a["median_response_size_bytes"] == 200
+    assert api_a["min_response_size_bytes"] == 100
+    assert api_a["max_response_size_bytes"] == 300
+
+
+def test_detect_failure_streaks_finds_consecutive_failures_and_resets():
+    observations = pd.DataFrame([
+        {"timestamp": pd.Timestamp("2026-10-15T12:00:00Z"), "endpoint": "api-a", "success": False, "error": "HTTP 500"},
+        {"timestamp": pd.Timestamp("2026-10-15T12:01:00Z"), "endpoint": "api-a", "success": False, "error": "HTTP 503"},
+        {"timestamp": pd.Timestamp("2026-10-15T12:02:00Z"), "endpoint": "api-a", "success": True, "error": None},
+        {"timestamp": pd.Timestamp("2026-10-15T12:03:00Z"), "endpoint": "api-a", "success": False, "error": "Timeout"},
+        {"timestamp": pd.Timestamp("2026-10-15T12:04:00Z"), "endpoint": "api-a", "success": False, "error": "Timeout"},
+        {"timestamp": pd.Timestamp("2026-10-15T12:05:00Z"), "endpoint": "api-a", "success": False, "error": "Timeout"},
+    ])
+    result = analysis.detect_failure_streaks(observations, min_length=2)
+    assert result["failure_count"].tolist() == [2, 3]
+    assert result.iloc[0]["errors"] == "HTTP 500; HTTP 503"
+
+
+def test_detect_failure_streaks_rejects_invalid_minimum():
+    with pytest.raises(ValueError, match="min_length"):
+        analysis.detect_failure_streaks(pd.DataFrame(), min_length=0)
+
+
+def test_plot_functions_create_pngs_for_observations_and_empty_data(tmp_path):
+    observations = pd.DataFrame([
+        {"timestamp": pd.Timestamp("2026-10-15T12:00:00Z"), "endpoint": "api-a", "response_time_ms": 100.0, "response_size_bytes": 200, "success": True},
+        {"timestamp": pd.Timestamp("2026-10-15T13:00:00Z"), "endpoint": "api-a", "response_time_ms": 300.0, "response_size_bytes": 400, "success": True},
+        {"timestamp": pd.Timestamp("2026-10-15T13:30:00Z"), "endpoint": "api-a", "response_time_ms": 50.0, "response_size_bytes": None, "success": False},
+    ])
+    latency = analysis.plot_latency_over_time(observations, tmp_path / "latency.png")
+    hourly_latency, hourly_error = analysis.plot_hourly_metrics(observations, tmp_path / "hourly.png", tmp_path / "errors.png")
+    size = analysis.plot_response_sizes(observations, tmp_path / "sizes.png")
+    empty = analysis.plot_response_sizes(pd.DataFrame(), tmp_path / "empty.png")
+    for path in (latency, hourly_latency, hourly_error, size, empty):
+        assert path.exists()
+        assert path.stat().st_size > 0

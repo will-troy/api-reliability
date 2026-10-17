@@ -1,0 +1,4 @@
+endpoint,responses_with_size,mean_response_size_bytes,median_response_size_bytes,p95_response_size_bytes,min_response_size_bytes,max_response_size_bytes
+github:psf/requests,5,6016.0,6016.0,6016.0,6016,6016
+jsonplaceholder:/posts/1,5,292.0,292.0,292.0,292,292
+"open-meteo:current-weather:40.7128,-74.006",5,368.8,369.0,369.8,368,370
