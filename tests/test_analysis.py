@@ -187,3 +187,61 @@ def test_main_prints_message_when_no_observations_exist(tmp_path, monkeypatch, c
     output = capsys.readouterr().out
     assert "Total observations: 0" in output
     assert "No observations found. Run the collector first." in output
+
+
+def test_analyze_by_hour_groups_by_endpoint_and_local_hour():
+    observations = pd.DataFrame([
+        {"timestamp": pd.Timestamp("2026-10-15T12:10:00Z"), "endpoint": "api-a", "response_time_ms": 100.0, "success": True},
+        {"timestamp": pd.Timestamp("2026-10-15T12:20:00Z"), "endpoint": "api-a", "response_time_ms": 300.0, "success": True},
+        {"timestamp": pd.Timestamp("2026-10-15T13:00:00Z"), "endpoint": "api-a", "response_time_ms": 900.0, "success": False},
+        {"timestamp": pd.Timestamp("2026-10-15T12:30:00Z"), "endpoint": "api-b", "response_time_ms": 50.0, "success": True},
+    ])
+    result = analysis.analyze_by_hour(observations, "UTC")
+    api_a = result[(result["endpoint"] == "api-a") & (result["hour_of_day"] == 12)].iloc[0]
+    assert api_a["request_count"] == 2
+    assert api_a["median_response_time_ms"] == 200.0
+    assert api_a["p95_response_time_ms"] == 290.0
+    assert api_a["error_rate_percent"] == 0.0
+    assert len(result) == 3
+
+
+def test_analyze_by_hour_respects_timezone():
+    observations = pd.DataFrame([
+        {"timestamp": pd.Timestamp("2026-10-15T12:10:00Z"), "endpoint": "api-a", "response_time_ms": 100.0, "success": True},
+    ])
+    result = analysis.analyze_by_hour(observations, "America/New_York")
+    assert result.iloc[0]["hour_of_day"] == 8  # EDT on this date
+
+
+def test_analyze_over_time_groups_into_clock_aligned_windows():
+    observations = pd.DataFrame([
+        {"timestamp": pd.Timestamp("2026-10-15T12:01:00Z"), "endpoint": "api-a", "response_time_ms": 100.0, "success": True},
+        {"timestamp": pd.Timestamp("2026-10-15T12:12:00Z"), "endpoint": "api-a", "response_time_ms": 300.0, "success": True},
+        {"timestamp": pd.Timestamp("2026-10-15T12:16:00Z"), "endpoint": "api-a", "response_time_ms": 900.0, "success": False},
+    ])
+    result = analysis.analyze_over_time(observations, window_minutes=15)
+    assert len(result) == 2
+    assert result.iloc[0]["window_start"] == "2026-10-15T12:00:00+00:00"
+    assert result.iloc[0]["request_count"] == 2
+    assert result.iloc[0]["median_response_time_ms"] == 200.0
+    assert result.iloc[1]["error_rate_percent"] == 100.0
+
+
+def test_analyze_over_time_rejects_invalid_window_size():
+    with pytest.raises(ValueError, match="window_minutes"):
+        analysis.analyze_over_time(pd.DataFrame(), window_minutes=0)
+
+
+def test_invalid_timezone_is_rejected():
+    with pytest.raises(ValueError, match="Unknown timezone"):
+        analysis.analyze_by_hour(pd.DataFrame(), "Mars/Olympus")
+
+
+def test_export_report_creates_parent_directory_and_csv(tmp_path):
+    filepath = tmp_path / "nested" / "hourly.csv"
+    data = pd.DataFrame([{"endpoint": "api-a", "hour_of_day": 12, "request_count": 2}])
+    count = analysis.export_report(data, filepath)
+    assert count == 1
+    loaded = pd.read_csv(filepath)
+    assert loaded.iloc[0]["endpoint"] == "api-a"
+    assert loaded.iloc[0]["request_count"] == 2
